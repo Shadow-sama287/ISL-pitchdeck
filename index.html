@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SignBridge – ISL Sign Language Translation System | Major Project Pitch</title>
+  <meta name="description" content="SignBridge: A bidirectional AI-powered Indian Sign Language translation system bridging deaf patients and medical professionals." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    /* ── Design Tokens ─────────────────── */
+    :root {
+      --c-bg:        #080C16;
+      --c-surface:   #0D1526;
+      --c-surface2:  #121C33;
+      --c-border:    rgba(255,255,255,.08);
+      --c-teal:      #00D4AA;
+      --c-cyan:      #38BDF8;
+      --c-violet:    #818CF8;
+      --c-amber:     #FBBF24;
+      --c-red:       #F87171;
+      --c-text:      #F0F4FF;
+      --c-muted:     #8B9CC8;
+      --c-dim:       #3D4F77;
+      --grad-teal:   linear-gradient(135deg,#00D4AA,#0EA5E9);
+      --grad-violet: linear-gradient(135deg,#6366F1,#8B5CF6);
+      --grad-amber:  linear-gradient(135deg,#F59E0B,#F97316);
+      --font-sans:   'Inter',system-ui,sans-serif;
+      --font-mono:   'JetBrains Mono',monospace;
+      --radius-sm:   8px;
+      --radius-md:   16px;
+      --shadow-card: 0 8px 32px rgba(0,0,0,.45);
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    html{font-size:17.6px}
+    body{font-family:var(--font-sans);background:var(--c-bg);color:var(--c-text);overflow:hidden;height:100vh;width:100vw;user-select:none}
+
+    /* ── Slide System ─────────────────── */
+    .deck{position:relative;width:100vw;height:100vh;overflow:hidden}
+    .slide{
+      position:absolute;inset:0;width:100%;height:100%;
+      display:flex;flex-direction:column;justify-content:center;align-items:center;
+      padding:44px 60px;
+      opacity:0;pointer-events:none;transform:translateX(60px);
+      transition:opacity .45s cubic-bezier(.4,0,.2,1),transform .45s cubic-bezier(.4,0,.2,1);
+      background:linear-gradient(135deg,#080C16 0%,#0D2137 60%,#091A27 100%);
+      overflow:hidden
+    }
+    .slide::before{
+      content:'';position:absolute;inset:0;
+      background-image:linear-gradient(rgba(255,255,255,.022) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.022) 1px,transparent 1px);
+      background-size:48px 48px;pointer-events:none
+    }
+    .slide.active{opacity:1;pointer-events:all;transform:translateX(0)}
+    .slide.exit{opacity:0;transform:translateX(-60px)}
+
+    /* ── Nav ──────────────────────────── */
+    #nav{
+      position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:100;
+      display:flex;align-items:center;gap:10px;
+      background:rgba(13,21,38,.88);backdrop-filter:blur(20px);
+      border:1px solid var(--c-border);padding:8px 18px;border-radius:999px;
+      box-shadow:var(--shadow-card)
+    }
+    .nav-btn{
+      background:none;border:none;color:var(--c-muted);cursor:pointer;
+      padding:5px 11px;border-radius:999px;font-size:13px;font-family:var(--font-sans);
+      transition:background .2s,color .2s;display:flex;align-items:center;gap:5px
+    }
+    .nav-btn:hover{background:rgba(0,212,170,.15);color:var(--c-teal)}
+    .nav-btn svg{width:15px;height:15px}
+    #slide-counter{font-size:12px;color:var(--c-muted);font-variant-numeric:tabular-nums;min-width:48px;text-align:center}
+    .dot-track{display:flex;gap:5px;align-items:center}
+    .dot{width:6px;height:6px;border-radius:50%;background:var(--c-dim);transition:background .25s,transform .25s;cursor:pointer;border:none}
+    .dot.active{background:var(--c-teal);transform:scale(1.4)}
+
+    /* ── Fixed overlays ───────────────── */
+    #progress-bar{position:fixed;top:0;left:0;height:3px;background:var(--grad-teal);transition:width .4s ease;z-index:200;border-radius:0 2px 2px 0}
+    #slide-label{position:fixed;top:18px;left:22px;z-index:100;font-size:11px;color:var(--c-dim);font-family:var(--font-mono);letter-spacing:.06em}
+    #key-hint{position:fixed;top:18px;right:22px;z-index:100;font-size:11px;color:var(--c-dim);font-family:var(--font-mono)}
+
+    /* ── Typography ───────────────────── */
+    .tag{
+      display:inline-block;font-size:12px;font-weight:600;letter-spacing:.12em;
+      text-transform:uppercase;padding:4px 12px;border-radius:999px;
+      background:rgba(0,212,170,.12);color:var(--c-teal);border:1px solid rgba(0,212,170,.25);margin-bottom:16px
+    }
+    .tag.violet{background:rgba(129,140,248,.12);color:var(--c-violet);border-color:rgba(129,140,248,.25)}
+    .tag.amber{background:rgba(251,191,36,.10);color:var(--c-amber);border-color:rgba(251,191,36,.25)}
+    .tag.cyan{background:rgba(56,189,248,.10);color:var(--c-cyan);border-color:rgba(56,189,248,.25)}
+    .tag.red{background:rgba(248,113,113,.10);color:var(--c-red);border-color:rgba(248,113,113,.25)}
+    /* accent helpers for inline text (avoid display-breaking spans) */
+    .acc-r{color:var(--c-red)}
+    .acc-a{color:var(--c-amber)}
+    .acc-t{color:var(--c-teal)}
+    .acc-v{color:var(--c-violet)}
+    .acc-d{color:var(--c-dim)}
+
+    h1.hero-title{
+      font-size:clamp(2.8rem,5.5vw,4.4rem);font-weight:900;line-height:1.06;letter-spacing:-.03em;
+      background:var(--grad-teal);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text
+    }
+    h2.slide-title{font-size:clamp(1.85rem,3.4vw,2.75rem);font-weight:800;line-height:1.15;letter-spacing:-.02em;color:var(--c-text)}
+    h2.slide-title .accent{color:var(--c-teal)}
+    h2.slide-title .accent-v{color:var(--c-violet)}
+    h2.slide-title .accent-r{color:var(--c-red)}
+    h2.slide-title .accent-a{color:var(--c-amber)}
+    .subtitle{font-size:clamp(1rem,1.7vw,1.2rem);color:var(--c-muted);line-height:1.65;max-width:660px}
+    .divider{width:52px;height:3px;border-radius:2px;background:var(--grad-teal);margin:12px 0}
+
+    /* ── Layout ───────────────────────── */
+    .sc{position:relative;z-index:2;width:100%;max-width:1080px;display:flex;flex-direction:column;align-items:flex-start;gap:18px}
+    .sc.ctr{align-items:center;text-align:center}
+    .two-col{display:grid;grid-template-columns:1fr 1fr;gap:32px;width:100%;align-items:center}
+    .two-col.lw{grid-template-columns:1.4fr 1fr}
+    .two-col.rw{grid-template-columns:1fr 1.4fr}
+
+    /* ── Cards ────────────────────────── */
+    .card{background:var(--c-surface);border:1px solid var(--c-border);border-radius:var(--radius-md);padding:22px 26px;box-shadow:var(--shadow-card)}
+    .hbox{background:linear-gradient(135deg,rgba(0,212,170,.08),rgba(56,189,248,.06));border:1px solid rgba(0,212,170,.25);border-radius:var(--radius-md);padding:16px 20px}
+    .hbox.v{background:linear-gradient(135deg,rgba(99,102,241,.08),rgba(139,92,246,.06));border-color:rgba(129,140,248,.25)}
+    .hbox.a{background:linear-gradient(135deg,rgba(245,158,11,.08),rgba(249,115,22,.06));border-color:rgba(251,191,36,.25)}
+
+    /* ── Stats ────────────────────────── */
+    .stat-num{font-size:clamp(2rem,4.5vw,3.4rem);font-weight:900;line-height:1;background:var(--grad-teal);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+    .stat-num.a{background:var(--grad-amber);-webkit-background-clip:text;background-clip:text}
+    .stat-num.v{background:var(--grad-violet);-webkit-background-clip:text;background-clip:text}
+    .stat-label{font-size:.8rem;color:var(--c-muted);margin-top:4px;text-transform:uppercase;letter-spacing:.07em;font-weight:500}
+
+    /* ── Bullet list ──────────────────── */
+    .bl{list-style:none;display:flex;flex-direction:column;gap:11px}
+    .bl li{display:flex;gap:11px;align-items:flex-start;font-size:.97rem;color:var(--c-text);line-height:1.5}
+    .bl li::before{content:'';flex-shrink:0;margin-top:7px;width:7px;height:7px;border-radius:50%;background:var(--grad-teal)}
+    .bl li strong{color:var(--c-teal)}
+    .bl li.v::before{background:var(--grad-violet)}
+    .bl li.a::before{background:var(--grad-amber)}
+
+    /* ── Pipeline ─────────────────────── */
+    .pipeline{display:flex;flex-direction:column;gap:6px;width:100%}
+    .ps{display:flex;align-items:center;gap:10px;background:var(--c-surface2);border:1px solid var(--c-border);border-radius:var(--radius-sm);padding:9px 14px;font-size:.86rem;font-family:var(--font-mono);transition:border-color .2s,transform .2s;cursor:default}
+    .ps:hover{border-color:var(--c-teal);transform:translateX(4px)}
+    .pd{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+    .arr{color:var(--c-dim);font-size:.68rem;padding-left:6px}
+
+    /* ── Compare table ────────────────── */
+    .ctbl{width:100%;border-collapse:collapse;font-size:.88rem}
+    .ctbl th{background:var(--c-surface2);color:var(--c-muted);padding:9px 13px;text-align:left;font-weight:600;letter-spacing:.06em;text-transform:uppercase;font-size:.75rem;border-bottom:1px solid var(--c-border)}
+    .ctbl td{padding:9px 13px;color:var(--c-text);border-bottom:1px solid rgba(255,255,255,.04)}
+    .ctbl tr:hover td{background:rgba(255,255,255,.03)}
+    .ck{color:var(--c-teal);font-weight:700}
+    .cx{color:var(--c-red)}
+    .cp{color:var(--c-amber)}
+
+    /* ── Roadmap ──────────────────────── */
+    .rm{display:flex;flex-direction:column;gap:0;position:relative;padding-left:22px}
+    .rm::before{content:'';position:absolute;left:6px;top:12px;bottom:12px;width:2px;background:linear-gradient(180deg,var(--c-teal),var(--c-violet))}
+    .rm-item{display:flex;gap:14px;padding:10px 0;position:relative}
+    .rmd{position:absolute;left:-19px;top:16px;width:11px;height:11px;border-radius:50%;border:2px solid var(--c-teal);background:var(--c-bg);flex-shrink:0}
+    .rmd.v{border-color:var(--c-violet)}
+    .rmd.a{border-color:var(--c-amber)}
+    .rmd.c{border-color:var(--c-cyan)}
+    .rm-phase{font-size:.68rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--c-teal);margin-bottom:3px}
+    .rm-phase.v{color:var(--c-violet)}
+    .rm-phase.a{color:var(--c-amber)}
+    .rm-phase.c{color:var(--c-cyan)}
+
+    /* ── Glow blobs ───────────────────── */
+    .gb{position:absolute;border-radius:50%;filter:blur(80px);opacity:.32;pointer-events:none}
+
+    /* ── Icon circles ─────────────────── */
+    .ic{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.25rem;flex-shrink:0}
+    .ic.t{background:rgba(0,212,170,.15)}
+    .ic.v{background:rgba(129,140,248,.15)}
+    .ic.a{background:rgba(251,191,36,.12)}
+    .ic.r{background:rgba(248,113,113,.12)}
+    .ic.c{background:rgba(56,189,248,.12)}
+
+    /* ── Team chips ───────────────────── */
+    .chip{display:inline-flex;align-items:center;gap:8px;background:var(--c-surface);border:1px solid var(--c-border);border-radius:999px;padding:6px 16px 6px 8px;font-size:.78rem;color:var(--c-muted)}
+    .av{width:24px;height:24px;border-radius:50%;background:var(--grad-teal);display:flex;align-items:center;justify-content:center;font-size:.62rem;font-weight:700;color:#000}
+
+    /* ── Quote ────────────────────────── */
+    .qt{border-left:3px solid var(--c-teal);padding:10px 18px;background:rgba(0,212,170,.05);border-radius:0 var(--radius-sm) var(--radius-sm) 0;font-style:italic;color:var(--c-muted);font-size:.9rem;line-height:1.6}
+
+    /* ── Misc ─────────────────────────── */
+    .logo{width:80px;height:80px;border-radius:var(--radius-md);object-fit:contain;box-shadow:0 0 40px rgba(0,212,170,.25)}
+    @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+    @keyframes pulse-ring{0%{box-shadow:0 0 0 0 rgba(0,212,170,.4)}70%{box-shadow:0 0 0 18px rgba(0,212,170,0)}100%{box-shadow:0 0 0 0 rgba(0,212,170,0)}}
+    .floating{animation:float 4s ease-in-out infinite}
+    .pring{animation:pulse-ring 2.5s ease infinite}
+    @media(max-width:768px){.slide{padding:28px 20px}.two-col,.two-col.lw,.two-col.rw{grid-template-columns:1fr;gap:16px}}
+
+    /* ── Laser pointer cursor ─────────── */
+    body{cursor:none}
+    #laser{
+      position:fixed;top:0;left:0;z-index:9999;
+      pointer-events:none;
+      transform:translate(-50%,-50%);
+      will-change:transform;
+    }
+    #laser .halo{
+      position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+      width:36px;height:36px;border-radius:50%;
+      background:radial-gradient(circle,rgba(0,212,170,.35) 0%,transparent 70%);
+      transition:transform .08s ease,opacity .08s ease;
+    }
+    #laser .dot{
+      position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+      width:10px;height:10px;border-radius:50%;
+      background:#00D4AA;
+      box-shadow:0 0 6px 2px rgba(0,212,170,.9),0 0 14px 4px rgba(0,212,170,.5);
+      transition:transform .06s ease;
+    }
+    #laser.click .dot{
+      transform:translate(-50%,-50%) scale(1.8);
+      background:#fff;
+      box-shadow:0 0 10px 4px rgba(255,255,255,.9),0 0 24px 8px rgba(0,212,170,.7);
+    }
+    #laser.click .halo{
+      transform:translate(-50%,-50%) scale(2.2);
+      opacity:.2;
+    }
+    /* restore cursor on interactive controls */
+    #nav,#nav *,button,a,input,select,[role=button]{cursor:auto}
+  </style>
+</head>
+<body>
+
+<div id="progress-bar"></div>
+<div id="slide-label">SIGNBRIDGE · ISL SYSTEM</div>
+<div id="key-hint">← → Arrow Keys · Space</div>
+<!-- laser pointer cursor -->
+<div id="laser"><div class="halo"></div><div class="dot"></div></div>
+
+<div class="deck" id="deck">
+
+  <!-- ══════════════════════════════════════
+       SLIDE 1 · COVER
+  ═══════════════════════════════════════ -->
+  <section class="slide" id="s1">
+    <div class="gb" style="width:600px;height:600px;background:radial-gradient(circle,#00D4AA,transparent 70%);top:-200px;right:-150px;"></div>
+    <div class="gb" style="width:400px;height:400px;background:radial-gradient(circle,#6366F1,transparent 70%);bottom:-100px;left:-100px;"></div>
+    <div class="sc ctr" style="gap:24px;">
+      <img src="signbridge_icon.png" alt="SignBridge" class="logo floating" onerror="this.style.display='none'" />
+      <div>
+        <div class="tag">Major Project Proposal · 2026–27</div>
+        <h1 class="hero-title">SignBridge</h1>
+        <p style="font-size:clamp(1.1rem,2vw,1.5rem);font-weight:300;color:var(--c-cyan);margin-top:8px;letter-spacing:.02em;">Bidirectional System for Indian Sign Language in Healthcare</p>
+      </div>
+      <p class="subtitle" style="text-align:center;">
+        A research-driven bridge connecting <strong style="color:var(--c-text)">18 million deaf and hard-of-hearing Indians</strong> with medical professionals — through real-time ISL recognition &amp; animated translation.
+      </p>
+      <p style="font-size:.8rem;color:var(--c-dim);font-family:var(--font-mono);">Academic Year 2026–27 · B.Tech Major Project</p>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════
+       SLIDE 2 · THE PROBLEM
+  ═══════════════════════════════════════ -->
+  <section class="slide" id="s2">
+    <div class="gb" style="width:500px;height:500px;background:radial-gradient(circle,#F87171,transparent 70%);top:-150px;right:-100px;opacity:.22;"></div>
+    <div class="sc">
+      <div class="tag red">The Problem</div>
+      <h2 class="slide-title">A <span class="accent-r">Silent Crisis</span> in Indian Healthcare</h2>
+      <div class="divider" style="background:var(--c-red)"></div>
+      <div class="two-col" style="gap:28px;">
+        <div style="display:flex;flex-direction:column;gap:14px;">
+          <ul class="bl">
+            <li><strong style="color:var(--c-red)">18 million</strong> deaf &amp; hard-of-hearing individuals in India face acute communication barriers in hospitals.</li>
+            <li>Acute shortage of <strong>certified ISL interpreters</strong> in healthcare settings across India.</li>
+            <li>Current workarounds — written notes or family proxies — lead to <strong>misdiagnoses</strong> &amp; compromised patient privacy.</li>
+            <li>Patients lose autonomy over their own healthcare decisions.</li>
+          </ul>
+          <div class="qt">"No real-time, bidirectional system exists that converts spoken/written regional languages to ISL animations, and interprets live ISL gestures back to medical text or speech."</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="card" style="text-align:center;padding:20px 16px;">
+            <div class="stat-num" style="background:var(--c-red);-webkit-background-clip:text;background-clip:text;">18M</div>
+            <div class="stat-label">Deaf &amp; HoH in India</div>
+          </div>
+          <div class="card" style="text-align:center;padding:20px 16px;">
+            <div class="stat-num a">~0</div>
+            <div class="stat-label">Certified ISL Interpreters per Hospital</div>
+          </div>
+          <div class="card" style="text-align:center;grid-column:1/-1;padding:18px 16px;">
+            <div class="stat-num v" style="font-size:1.6rem;">Critical Gap</div>
+            <div class="stat-label">No real-time bidirectional ISL ↔ Hindi/English system for clinical use</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════
+       SLIDE 3 · SOLUTION
+  ═══════════════════════════════════════ -->
+  <section class="slide" id="s3">
+    <div class="gb" style="width:600px;height:600px;background:radial-gradient(circle,#00D4AA,transparent 70%);bottom:-200px;right:-150px;"></div>
+    <div class="sc">
+      <div class="tag">The Solution</div>
+      <h2 class="slide-title">Introducing <span class="accent">SignBridge</span></h2>
+      <div class="divider"></div>
+      <div class="two-col lw" style="gap:32px;">
+        <div style="display:flex;flex-direction:column;gap:14px;">
+          <p class="subtitle">A <strong style="color:var(--c-text)">bidirectional translation system</strong> enabling seamless, unassisted communication between medical professionals and deaf patients — no interpreter required.</p>
+          <div class="hbox" style="display:flex;gap:12px;align-items:flex-start;">
+            <div class="ic t">🎯</div>
+            <div><p style="font-weight:600;font-size:.88rem;margin-bottom:3px;">ISL → Text / Speech</p><p style="color:var(--c-muted);font-size:.78rem;">Computer-vision pipeline interprets live gestures → medical text or audio in real time.</p></div>
+          </div>
+          <div class="hbox v" style="display:flex;gap:12px;align-items:flex-start;">
+            <div class="ic v">🤖</div>
+            <div><p style="font-weight:600;font-size:.88rem;margin-bottom:3px;">Speech / Text → ISL Avatar</p><p style="color:var(--c-muted);font-size:.78rem;">Doctor's words translate into accurate ISL animations via a 3D avatar — real time.</p></div>
+          </div>
+          <div class="hbox a" style="display:flex;gap:12px;align-items:flex-start;">
+            <div class="ic a">🏥</div>
+            <div><p style="font-weight:600;font-size:.88rem;margin-bottom:3px;">Healthcare-First Design</p><p style="color:var(--c-muted);font-size:.78rem;">Medical vocab optimised, privacy-first, deployable on standard clinical hardware.</p></div>
+          </div>
+        </div>
+        <div class="card" style="display:flex;flex-direction:column;gap:10px;align-items:center;justify-content:center;text-align:center;min-height:260px;">
+          <div style="font-size:3rem;">🤝</div>
+          <p style="font-weight:700;font-size:1rem;">Doctor ↔ Patient</p>
+          <div class="divider" style="align-self:center;margin:4px 0;"></div>
+          <p style="color:var(--c-muted);font-size:.78rem;line-height:1.6;">No interpreter. No written notes. No privacy compromise. Fluid, real-time communication in both directions.</p>
+          <div class="tag" style="margin:6px 0 0;">Unassisted · Real-time · Bidirectional</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════
+       SLIDE 4 · RESEARCH FOUNDATION
+  ═══════════════════════════════════════ -->
+  <section class="slide" id="s4">
+    <div class="gb" style="width:450px;height:450px;background:radial-gradient(circle,#818CF8,transparent 70%);top:-100px;left:-100px;opacity:.28;"></div>
+    <div class="sc">
+      <div class="tag violet">Literature Review</div>
+      <h2 class="slide-title">Grounded in <span class="accent-v">Research</span> — 20+ Papers Reviewed</h2>
+      <div class="divider" style="background:var(--grad-violet)"></div>
+      <div class="two-col" style="gap:24px;">
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          <p style="color:var(--c-muted);font-size:.84rem;line-height:1.6;">Three pivotal research axes form SignBridge's foundation:</p>
+          <div class="card" style="display:flex;gap:10px;align-items:flex-start;padding:16px 18px;">
+            <div class="ic v" style="width:34px;height:34px;font-size:.95rem;">📄</div>
+            <div><p style="font-weight:600;font-size:.82rem;">INCLUDE Dataset Benchmarking <span style="color:var(--c-dim)">· Das et al. 2022</span></p><p style="color:var(--c-muted);font-size:.74rem;margin-top:4px;">Only paper benchmarking real dynamic ISL on the public INCLUDE dataset — our Stage 1 baseline.</p></div>
+          </div>
+          <div class="card" style="display:flex;gap:10px;align-items:flex-start;padding:16px 18px;">
+            <div class="ic t" style="width:34px;height:34px;font-size:.95rem;">🗺️</div>
+            <div><p style="font-weight:600;font-size:.82rem;">SL Translation Survey <span style="color:var(--c-dim)">· 2024 · 146 Papers</span></p><p style="color:var(--c-muted);font-size:.74rem;margin-top:4px;">Maps the full field 2011–2024; quantifies ISL imbalance (isolated >> continuous) — informing our gap analysis.</p></div>
+          </div>
+          <div class="card" style="display:flex;gap:10px;align-items:flex-start;padding:16px 18px;">
+            <div class="ic a" style="width:34px;height:34px;font-size:.95rem;">⚡</div>
+            <div><p style="font-weight:600;font-size:.82rem;">Transformer Empirical Study <span style="color:var(--c-dim)">· Shahin &amp; Ismail 2025</span></p><p style="color:var(--c-muted);font-size:.74rem;margin-top:4px;">Tests 4 Transformer variants on sign gloss-to-text translation — directly applicable to our Stage 2 pipeline.</p></div>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          <p style="font-weight:600;font-size:.82rem;color:var(--c-teal);text-transform:uppercase;letter-spacing:.08em;">Key Field Insights</p>
+          <div class="hbox" style="padding:12px 16px;"><p style="font-size:.78rem;font-weight:600;color:var(--c-text);margin-bottom:4px;">🏆 Two Dominant Tracks</p><p style="font-size:.72rem;color:var(--c-muted);line-height:1.5;">Landmark-based (edge-fast) vs CNN+Attention (high-accuracy). We combine both for the best of each.</p></div>
+          <div class="hbox" style="padding:12px 16px;"><p style="font-size:.78rem;font-weight:600;color:var(--c-text);margin-bottom:4px;">🚩 Critical Gap: Continuous ISL</p><p style="font-size:.72rem;color:var(--c-muted);line-height:1.5;">Field heavily skewed toward isolated/static signs. Real-world continuous ISL is largely unsolved.</p></div>
+          <div class="hbox v" style="padding:12px 16px;"><p style="font-size:.78rem;font-weight:600;color:var(--c-text);margin-bottom:4px;">💡 Intermediate Rep. Pattern</p><p style="font-size:.72rem;color:var(--c-muted);line-height:1.5;">Keypoint sequences → Gloss intermediary. Papers that skip it degrade badly on OOV words.</p></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════
+       SLIDE 5 · ARCHITECTURE
+  ═══════════════════════════════════════ -->
+  <section class="slide" id="s5">
+    <div class="gb" style="width:500px;height:500px;background:radial-gradient(circle,#38BDF8,transparent 70%);bottom:-150px;left:-100px;opacity:.22;"></div>
+    <div class="sc">
+      <div class="tag cyan">Technical Architecture</div>
+      <h2 class="slide-title">A Two-Stage <span class="accent">Recognition Pipeline</span></h2>
+      <div class="divider"></div>
+      <div class="two-col rw" style="gap:32px;align-items:flex-start;">
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          <p style="font-size:.7rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--c-teal);margin-bottom:2px;">Stage 1 · ISL Recognition</p>
+          <div class="pipeline">
+            <div class="ps"><div class="pd" style="background:#38BDF8;"></div>Camera Input<span class="arr">→</span></div>
+            <div class="ps"><div class="pd" style="background:#00D4AA;"></div>MediaPipe Keypoints (126 floats)<span class="arr">→</span></div>
+            <div class="ps"><div class="pd" style="background:#818CF8;"></div>Keyframe Pruning (Histogram Diff)<span class="arr">→</span></div>
+            <div class="ps"><div class="pd" style="background:#FBBF24;"></div>EfficientNet-B0 Spatial Features<span class="arr">→</span></div>
+            <div class="ps"><div class="pd" style="background:#F87171;"></div>BiLSTM Temporal Modeling<span class="arr">→</span></div>
+            <div class="ps" style="border-color:var(--c-teal);"><div class="pd" style="background:var(--c-teal);"></div><strong style="color:var(--c-teal);">Gloss Output</strong> (intermediate rep.)</div>
+          </div>
+          <div class="divider" style="width:20px;margin:2px 0;"></div>
+          <p style="font-size:.7rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--c-violet);margin-bottom:2px;">Stage 2 · Translation</p>
+          <div class="pipeline">
+            <div class="ps"><div class="pd" style="background:var(--c-teal);"></div>Gloss Input<span class="arr">→</span></div>
+            <div class="ps"><div class="pd" style="background:#818CF8;"></div>Encoder-Decoder Transformer<span class="arr">→</span></div>
+            <div class="ps" style="border-color:var(--c-violet);"><div class="pd" style="background:var(--c-violet);"></div><strong style="color:var(--c-violet);">Text / TTS Output</strong></div>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:11px;">
+          <p style="font-size:.84rem;font-weight:600;color:var(--c-text);">Why this architecture wins:</p>
+          <ul class="bl">
+            <li><strong>Keyframe pruning</strong> solves the "too many frames" problem on edge/mobile hardware.</li>
+            <li><strong>MediaPipe landmarks</strong> (~126 floats) keep input tiny — robust to lighting &amp; background clutter.</li>
+            <li><strong>BiLSTM</strong> handles temporal context without needing massive datasets.</li>
+            <li class="v"><strong style="color:var(--c-violet)">Gloss intermediary is non-negotiable</strong> — systems that skip it degrade badly on OOV words.</li>
+            <li class="a"><strong style="color:var(--c-amber)">Bidirectional loop</strong>: Doctor speaks + Patient signs — both directions covered.</li>
+          </ul>
+          <div class="card" style="padding:14px 18px;margin-top:4px;">
+            <p style="font-size:.72rem;color:var(--c-muted);line-height:1.6;font-family:var(--font-mono);">Avatar Path: Speech → NLP Gloss → ISL Dict Lookup → 3D Skeleton Animation</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════
+       SLIDE 6 · THE GAP / WHY NOW
+  ═══════════════════════════════════════ -->
+  <section class="slide" id="s6">
+    <div class="gb" style="width:500px;height:500px;background:radial-gradient(circle,#FBBF24,transparent 70%);top:-100px;right:-100px;opacity:.18;"></div>
+    <div class="sc">
+      <div class="tag amber">Research Gap &amp; Novelty</div>
+      <h2 class="slide-title">Why This Has <span class="accent-a">Not Been Solved</span> Yet</h2>
+      <div class="divider" style="background:var(--grad-amber)"></div>
+      <div class="two-col" style="gap:24px;align-items:flex-start;">
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          <p style="color:var(--c-muted);font-size:.93rem;line-height:1.6;">Our review of 20+ papers revealed structural gaps in current ISL research:</p>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <div style="flex:1;background:var(--c-surface2);border-radius:4px;height:7px;overflow:hidden;"><div style="width:85%;height:100%;background:var(--c-red);border-radius:4px;"></div></div>
+              <span style="font-size:.72rem;color:var(--c-muted);white-space:nowrap;min-width:130px;">85% — Static/Isolated</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;">
+              <div style="flex:1;background:var(--c-surface2);border-radius:4px;height:7px;overflow:hidden;"><div style="width:15%;height:100%;background:var(--c-teal);border-radius:4px;"></div></div>
+              <span style="font-size:.72rem;color:var(--c-muted);white-space:nowrap;min-width:130px;">15% — Continuous ISL ← us</span>
+            </div>
+          </div>
+          <div class="hbox a" style="margin-top:4px;">
+            <p style="font-size:.78rem;font-weight:600;color:var(--c-amber);margin-bottom:6px;">Recurring Failure Points in Existing Systems</p>
+            <ul style="list-style:none;display:flex;flex-direction:column;gap:5px;">
+              <li style="font-size:.73rem;color:var(--c-muted);">⚠️ Background clutter &amp; lighting variance</li>
+              <li style="font-size:.73rem;color:var(--c-muted);">⚠️ Signer variation &amp; occlusion</li>
+              <li style="font-size:.73rem;color:var(--c-muted);">⚠️ Missing non-manual cues (face/head/body grammar)</li>
+              <li style="font-size:.73rem;color:var(--c-muted);">⚠️ No real-world continuous ISL evaluation</li>
+              <li style="font-size:.73rem;color:var(--c-muted);">⚠️ Zero clinical deployment in Indian context</li>
+            </ul>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          <p style="font-size:.84rem;font-weight:600;color:var(--c-text);">SignBridge's Novelty Claims:</p>
+          <ul class="bl">
+            <li><strong>First</strong> bidirectional ISL ↔ Hindi/English system designed specifically for Indian healthcare.</li>
+            <li class="v"><strong style="color:var(--c-violet)">Continuous ISL</strong> — not just isolated alphabets or single words.</li>
+            <li class="a"><strong style="color:var(--c-amber)">Two-stage architecture</strong> with gloss as structured intermediary — proven to prevent OOV failures.</li>
+            <li>Robustness-first: MediaPipe landmarks over raw pixels — works in real clinical environments.</li>
+            <li>Avatar-based output — accessible even for tech-naive patients.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════
+       SLIDE 7 · TECH STACK
+  ═══════════════════════════════════════ -->
+  <section class="slide" id="s7">
+    <div class="gb" style="width:500px;height:500px;background:radial-gradient(circle,#6366F1,transparent 70%);bottom:-150px;right:-100px;opacity:.28;"></div>
+    <div class="sc">
+      <div class="tag violet">Technology Stack</div>
+      <h2 class="slide-title">Built on <span class="accent-v">Proven</span> Open Tools</h2>
+      <div class="divider" style="background:var(--grad-violet)"></div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;width:100%;">
+        <div class="card" style="display:flex;flex-direction:column;gap:9px;padding:18px 20px;">
+          <div style="display:flex;align-items:center;gap:9px;"><div class="ic c" style="font-size:1.05rem;">👁️</div><p style="font-weight:700;font-size:.84rem;">Vision Layer</p></div>
+          <ul style="list-style:none;display:flex;flex-direction:column;gap:5px;padding:0;">
+            <li style="font-size:.74rem;color:var(--c-muted);display:flex;gap:7px;"><span style="color:var(--c-cyan);">▸</span>MediaPipe Holistic</li>
+            <li style="font-size:.74rem;color:var(--c-muted);display:flex;gap:7px;"><span style="color:var(--c-cyan);">▸</span>OpenCV preprocessing</li>
+            <li style="font-size:.74rem;color:var(--c-muted);display:flex;gap:7px;"><span style="color:var(--c-cyan);">▸</span>Histogram Keyframe Filter</li>
+          </ul>
+        </div>
+        <div class="card" style="display:flex;flex-direction:column;gap:9px;padding:18px 20px;">
+          <div style="display:flex;align-items:center;gap:9px;"><div class="ic t" style="font-size:1.05rem;">🧠</div><p style="font-weight:700;font-size:.84rem;">ML Models</p></div>
+          <ul style="list-style:none;display:flex;flex-direction:column;gap:5px;padding:0;">
+            <li style="font-size:.74rem;color:var(--c-muted);display:flex;gap:7px;"><span style="color:var(--c-teal);">▸</span>EfficientNet-B0 (spatial)</li>
+            <li style="font-size:.74rem;color:var(--c-muted);display:flex;gap:7px;"><span style="color:var(--c-teal);">▸</span>BiLSTM (temporal)</li>
+            <li style="font-size:.74rem;color:var(--c-muted);display:flex;gap:7px;"><span style="color:var(--c-teal);">▸</span>Enc-Dec Transformer</li>
+          </ul>
+        </div>
+        <div class="card" style="display:flex;flex-direction:column;gap:9px;padding:18px 20px;">
+          <div style="display:flex;align-items:center;gap:9px;"><div class="ic v" style="font-size:1.05rem;">💬</div><p style="font-weight:700;font-size:.84rem;">NLP / Output</p></div>
+          <ul style="list-style:none;display:flex;flex-direction:column;gap:5px;padding:0;">
+            <li style="font-size:.74rem;color:var(--c-muted);display:flex;gap:7px;"><span style="color:var(--c-violet);">▸</span>ISL Gloss Dictionary</li>
+            <li style="font-size:.74rem;color:var(--c-muted);display:flex;gap:7px;"><span style="color:var(--c-violet);">▸</span>TTS (gTTS / pyttsx3)</li>
+            <li style="font-size:.74rem;color:var(--c-muted);display:flex;gap:7px;"><span style="color:var(--c-violet);">▸</span>3D ISL Avatar</li>
+          </ul>
+        </div>
+        <div class="card" style="display:flex;flex-direction:column;gap:9px;padding:18px 20px;">
+          <div style="display:flex;align-items:center;gap:9px;"><div class="ic a" style="font-size:1.05rem;">⚙️</div><p style="font-weight:700;font-size:.84rem;">Infrastructure</p></div>
+          <ul style="list-style:none;display:flex;flex-direction:column;gap:5px;padding:0;">
+            <li style="font-size:.74rem;color:var(--c-muted);display:flex;gap:7px;"><span style="color:var(--c-amber);">▸</span>Python 3.10+ / PyTorch</li>
+            <li style="font-size:.74rem;color:var(--c-muted);display:flex;gap:7px;"><span style="color:var(--c-amber);">▸</span>FastAPI backend</li>
+            <li style="font-size:.74rem;color:var(--c-muted);display:flex;gap:7px;"><span style="color:var(--c-amber);">▸</span>Edge-deployable (CPU/GPU)</li>
+          </ul>
+        </div>
+        <div class="card" style="display:flex;flex-direction:column;gap:9px;padding:18px 20px;">
+          <div style="display:flex;align-items:center;gap:9px;"><div class="ic r" style="font-size:1.05rem;">📦</div><p style="font-weight:700;font-size:.84rem;">Dataset</p></div>
+          <ul style="list-style:none;display:flex;flex-direction:column;gap:5px;padding:0;">
+            <li style="font-size:.74rem;color:var(--c-muted);display:flex;gap:7px;"><span style="color:var(--c-red);">▸</span>INCLUDE (public ISL)</li>
+            <li style="font-size:.74rem;color:var(--c-muted);display:flex;gap:7px;"><span style="color:var(--c-red);">▸</span>Custom medical vocab</li>
+            <li style="font-size:.74rem;color:var(--c-muted);display:flex;gap:7px;"><span style="color:var(--c-red);">▸</span>Data augmentation pipeline</li>
+          </ul>
+        </div>
+        <div class="card" style="display:flex;flex-direction:column;gap:9px;padding:18px 20px;">
+          <div style="display:flex;align-items:center;gap:9px;"><div class="ic t" style="font-size:1.05rem;">🌐</div><p style="font-weight:700;font-size:.84rem;">Frontend / UI</p></div>
+          <ul style="list-style:none;display:flex;flex-direction:column;gap:5px;padding:0;">
+            <li style="font-size:.74rem;color:var(--c-muted);display:flex;gap:7px;"><span style="color:var(--c-teal);">▸</span>React / Vite web app</li>
+            <li style="font-size:.74rem;color:var(--c-muted);display:flex;gap:7px;"><span style="color:var(--c-teal);">▸</span>WebRTC live camera feed</li>
+            <li style="font-size:.74rem;color:var(--c-muted);display:flex;gap:7px;"><span style="color:var(--c-teal);">▸</span>Tablet / kiosk-ready UI</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════
+       SLIDE 8 · COMPETITIVE LANDSCAPE
+  ═══════════════════════════════════════ -->
+  <section class="slide" id="s8">
+    <div class="gb" style="width:450px;height:450px;background:radial-gradient(circle,#00D4AA,transparent 70%);top:-100px;left:50%;opacity:.18;"></div>
+    <div class="sc">
+      <div class="tag">Competitive Landscape</div>
+      <h2 class="slide-title">SignBridge <span class="accent">Uniquely Positioned</span></h2>
+      <div class="divider"></div>
+      <div style="width:100%;overflow-x:auto;">
+        <table class="ctbl">
+          <thead>
+            <tr>
+              <th>System / Approach</th>
+              <th>Bidirectional</th>
+              <th>Continuous ISL</th>
+              <th>Healthcare-Specific</th>
+              <th>Indian Context</th>
+              <th>Real-Time</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td style="font-weight:600;color:var(--c-teal);">✦ SignBridge (ours)</td><td class="ck">✓</td><td class="ck">✓</td><td class="ck">✓</td><td class="ck">✓</td><td class="ck">✓</td></tr>
+            <tr><td>Generic SL Apps (ASL-focused)</td><td class="cx">✗</td><td class="cp">~</td><td class="cx">✗</td><td class="cx">✗</td><td class="cp">~</td></tr>
+            <tr><td>Academic ISL Models (Das et al.)</td><td class="cx">✗</td><td class="cp">~</td><td class="cx">✗</td><td class="ck">✓</td><td class="cx">✗</td></tr>
+            <tr><td>Human ISL Interpreter</td><td class="ck">✓</td><td class="ck">✓</td><td class="cp">~</td><td class="cp">~</td><td class="cp">~</td></tr>
+            <tr><td>Written Notes / Family Proxy</td><td class="cx">✗</td><td class="cx">✗</td><td class="cx">✗</td><td class="cp">~</td><td class="cx">✗</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;width:100%;margin-top:12px;">
+        <div class="hbox" style="text-align:center;padding:12px 16px;"><div class="stat-num" style="font-size:1.5rem;">ISL</div><p style="font-size:.7rem;color:var(--c-muted);margin-top:4px;">Indian-specific, not ASL/generic</p></div>
+        <div class="hbox v" style="text-align:center;padding:12px 16px;"><div class="stat-num v" style="font-size:1.5rem;">2-Way</div><p style="font-size:.7rem;color:var(--c-muted);margin-top:4px;">Doctor speaks + Patient signs</p></div>
+        <div class="hbox a" style="text-align:center;padding:12px 16px;"><div class="stat-num a" style="font-size:1.5rem;">Clinical</div><p style="font-size:.7rem;color:var(--c-muted);margin-top:4px;">Healthcare vocab &amp; privacy-first</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════
+       SLIDE 9 · IMPACT
+  ═══════════════════════════════════════ -->
+  <section class="slide" id="s9">
+    <div class="gb" style="width:500px;height:500px;background:radial-gradient(circle,#00D4AA,transparent 70%);bottom:-100px;right:-100px;opacity:.22;"></div>
+    <div class="sc">
+      <div class="tag">Impact &amp; Use Cases</div>
+      <h2 class="slide-title">Transforming <span class="accent">18 Million Lives</span> — Starting with Healthcare</h2>
+      <div class="divider"></div>
+      <div class="two-col lw" style="gap:32px;align-items:flex-start;">
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          <p style="color:var(--c-muted);font-size:.82rem;">Primary deployment targets in Year 1:</p>
+          <div class="card" style="display:flex;gap:12px;align-items:center;padding:14px 18px;"><div class="ic t" style="font-size:1.2rem;">🏥</div><div><p style="font-weight:600;font-size:.85rem;">OPD Consultation Rooms</p><p style="font-size:.74rem;color:var(--c-muted);">Doctor-patient intake and diagnosis conversations.</p></div></div>
+          <div class="card" style="display:flex;gap:12px;align-items:center;padding:14px 18px;"><div class="ic v" style="font-size:1.2rem;">🚑</div><div><p style="font-weight:600;font-size:.85rem;">Emergency Triage</p><p style="font-size:.74rem;color:var(--c-muted);">Fast symptom communication in critical situations.</p></div></div>
+          <div class="card" style="display:flex;gap:12px;align-items:center;padding:14px 18px;"><div class="ic a" style="font-size:1.2rem;">💊</div><div><p style="font-weight:600;font-size:.85rem;">Pharmacy &amp; Prescription</p><p style="font-size:.74rem;color:var(--c-muted);">Medication instructions and follow-up guidance.</p></div></div>
+          <div class="card" style="display:flex;gap:12px;align-items:center;padding:14px 18px;"><div class="ic c" style="font-size:1.2rem;">🎓</div><div><p style="font-weight:600;font-size:.85rem;">Medical Training Simulation</p><p style="font-size:.74rem;color:var(--c-muted);">Train healthcare workers in deaf patient communication.</p></div></div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          <div class="card" style="text-align:center;padding:24px 20px;">
+            <div class="stat-num" style="font-size:2.8rem;">18M+</div>
+            <div class="stat-label">People Directly Impacted</div>
+          </div>
+          <div class="hbox" style="padding:16px 18px;">
+            <p style="font-weight:700;font-size:.86rem;color:var(--c-teal);margin-bottom:8px;">Broader Vision (Year 2–3)</p>
+            <ul class="bl" style="gap:7px;">
+              <li style="font-size:.76rem;">Government hospital deployments across India</li>
+              <li class="v" style="font-size:.76rem;"><strong style="color:var(--c-violet)">Beyond healthcare:</strong> courts, banks, education</li>
+              <li class="a" style="font-size:.76rem;">Open-source ISL corpus contribution to research</li>
+            </ul>
+          </div>
+          <div class="card" style="background:linear-gradient(135deg,rgba(0,212,170,.08),rgba(56,189,248,.06));border-color:rgba(0,212,170,.2);padding:14px 18px;">
+            <p style="font-size:.76rem;color:var(--c-muted);line-height:1.6;font-style:italic;">"Aligning with UN SDG 3 (Good Health) &amp; SDG 10 (Reduced Inequalities) — accessible healthcare is a fundamental right."</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════
+       SLIDE 10 · CHALLENGES
+  ═══════════════════════════════════════ -->
+  <section class="slide" id="s10">
+    <div class="gb" style="width:450px;height:450px;background:radial-gradient(circle,#F87171,transparent 70%);top:-80px;right:-80px;opacity:.18;"></div>
+    <div class="sc">
+      <div class="tag red">Challenges &amp; Mitigations</div>
+      <h2 class="slide-title">Risks We've <span class="accent-a">Already Planned For</span></h2>
+      <div class="divider" style="background:var(--grad-amber)"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;width:100%;">
+        <div class="card" style="padding:16px 18px;">
+          <p style="font-weight:700;font-size:.82rem;color:var(--c-red);margin-bottom:8px;">⚠️ Data Scarcity (ISL)</p>
+          <p style="font-size:.76rem;color:var(--c-muted);line-height:1.5;margin-bottom:8px;">ISL has limited annotated datasets compared to ASL/BSL — a structural research imbalance.</p>
+          <p style="font-size:.76rem;color:var(--c-teal);"><strong>Mitigation:</strong> INCLUDE dataset + custom collection + transfer learning from ASL pretrained models.</p>
+        </div>
+        <div class="card" style="padding:16px 18px;">
+          <p style="font-weight:700;font-size:.82rem;color:var(--c-amber);margin-bottom:8px;">⚠️ Real-World Variability</p>
+          <p style="font-size:.76rem;color:var(--c-muted);line-height:1.5;margin-bottom:8px;">Lighting, background clutter, signer variation in live clinical settings.</p>
+          <p style="font-size:.76rem;color:var(--c-teal);"><strong>Mitigation:</strong> MediaPipe landmark-based input (agnostic to background), data augmentation, domain randomization.</p>
+        </div>
+        <div class="card" style="padding:16px 18px;">
+          <p style="font-weight:700;font-size:.82rem;color:var(--c-violet);margin-bottom:8px;">⚠️ Non-Manual Cues</p>
+          <p style="font-size:.76rem;color:var(--c-muted);line-height:1.5;margin-bottom:8px;">Facial expressions &amp; head movements carry ISL grammatical meaning that hands alone can't convey.</p>
+          <p style="font-size:.76rem;color:var(--c-teal);"><strong>Mitigation:</strong> MediaPipe Holistic captures face, body, and hand landmarks simultaneously.</p>
+        </div>
+        <div class="card" style="padding:16px 18px;">
+          <p style="font-weight:700;font-size:.82rem;color:var(--c-cyan);margin-bottom:8px;">⚠️ OOV Medical Terms</p>
+          <p style="font-size:.76rem;color:var(--c-muted);line-height:1.5;margin-bottom:8px;">Out-of-vocabulary medical terminology not present in the standard ISL dictionary.</p>
+          <p style="font-size:.76rem;color:var(--c-teal);"><strong>Mitigation:</strong> Gloss intermediary + finger-spelling fallback + custom medical vocabulary expansion.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  
+  <!-- ══════════════════════════════════════
+       SLIDE 12 · VISION / CLOSING
+  ═══════════════════════════════════════ -->
+  <section class="slide" id="s12">
+    <div class="gb" style="width:700px;height:700px;background:radial-gradient(circle,#00D4AA,transparent 65%);top:-250px;right:-200px;opacity:.28;"></div>
+    <div class="gb" style="width:500px;height:500px;background:radial-gradient(circle,#6366F1,transparent 65%);bottom:-200px;left:-100px;opacity:.22;"></div>
+    <div class="sc ctr" style="gap:28px;max-width:780px;">
+      <div class="tag">The Vision</div>
+      <h2 class="slide-title" style="text-align:center;font-size:clamp(2.1rem,3.8vw,3rem);">Every Deaf Patient Deserves a <span class="accent">Voice</span></h2>
+      <p class="subtitle" style="text-align:center;font-size:1.05rem;max-width:600px;">SignBridge is not just a translation tool — it's a targeted research effort for 18 million Indians who have been shut out of their own healthcare.</p>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;width:100%;max-width:680px;margin-top:4px;">
+        <div class="card" style="text-align:center;padding:20px 16px;"><div class="stat-num" style="font-size:2rem;">ISL</div><div class="stat-label">Indian Sign Language, not adapted from ASL</div></div>
+        <div class="card" style="text-align:center;padding:20px 16px;"><div class="stat-num v" style="font-size:2rem;">Open</div><div class="stat-label">Own dataset collection &amp; open research</div></div>
+        <div class="card" style="text-align:center;padding:20px 16px;"><div class="stat-num a" style="font-size:2rem;">2-Way</div><div class="stat-label">Truly bidirectional communication</div></div>
+      </div>
+      <div class="hbox" style="padding:18px 24px;width:100%;max-width:660px;text-align:center;">
+        <p style="font-size:.88rem;color:var(--c-text);font-weight:600;margin-bottom:6px;">Open Questions &amp; Next Steps</p>
+        <p style="font-size:.76rem;color:var(--c-muted);line-height:1.7;">Seeking faculty guidance on ISL corpus partnerships · Exploring collaboration with AIISH Mysore · Formalising project scope &amp; guide allocation</p>
+      </div>
+      <p style="font-size:.78rem;color:var(--c-dim);font-family:var(--font-mono);">Thank you · Questions welcome</p>
+    </div>
+  </section>
+
+</div><!-- /deck -->
+
+<!-- ── Navigation ──────────────────────────────────────────── -->
+<nav id="nav">
+  <button class="nav-btn" id="btn-prev">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 12L6 8l4-4"/></svg>Prev
+  </button>
+  <div class="dot-track" id="dot-track" role="tablist"></div>
+  <span id="slide-counter">1 / 12</span>
+  <button class="nav-btn" id="btn-next">
+    Next<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 12l4-4-4-4"/></svg>
+  </button>
+</nav>
+
+<script>
+  const slides = Array.from(document.querySelectorAll('.slide'));
+  const total  = slides.length;
+  let cur      = 0;
+  let busy     = false;
+
+  const dotTrack = document.getElementById('dot-track');
+  const counter  = document.getElementById('slide-counter');
+  const pbar     = document.getElementById('progress-bar');
+  const lbl      = document.getElementById('slide-label');
+  const dots     = [];
+
+  const TITLES = ['Cover','Problem','Solution','Research','Architecture','Gap & Novelty','Tech Stack','Competition','Impact','Challenges','Vision'];
+
+  slides.forEach((_, i) => {
+    const d = document.createElement('button');
+    d.className = 'dot' + (i===0?' active':'');
+    d.setAttribute('aria-label', `Slide ${i+1}`);
+    d.addEventListener('click', () => go(i));
+    dotTrack.appendChild(d);
+    dots.push(d);
+  });
+
+  function ui() {
+    dots.forEach((d,i) => d.classList.toggle('active', i===cur));
+    counter.textContent = `${cur+1} / ${total}`;
+    pbar.style.width    = `${(cur+1)/total*100}%`;
+    lbl.textContent     = `SIGNBRIDGE · ${(TITLES[cur]||'').toUpperCase()}`;
+  }
+
+  function go(idx) {
+    if (busy || idx === cur) return;
+    busy = true;
+    const prev = slides[cur], next = slides[idx];
+    prev.classList.add('exit');
+    prev.classList.remove('active');
+    next.style.transform = idx > cur ? 'translateX(60px)' : 'translateX(-60px)';
+    next.style.opacity   = '0';
+    next.classList.add('active');
+    requestAnimationFrame(() => {
+      next.style.transform = '';
+      next.style.opacity   = '';
+      setTimeout(() => { prev.classList.remove('exit'); busy = false; }, 460);
+    });
+    cur = idx;
+    ui();
+  }
+
+  const next = () => go(Math.min(cur+1, total-1));
+  const prev = () => go(Math.max(cur-1, 0));
+
+  document.getElementById('btn-next').onclick = next;
+  document.getElementById('btn-prev').onclick = prev;
+
+  document.addEventListener('keydown', e => {
+    if (e.key==='ArrowRight'||e.key===' '||e.key==='PageDown'){ e.preventDefault(); next(); }
+    if (e.key==='ArrowLeft'  ||e.key==='PageUp')              { e.preventDefault(); prev(); }
+    if (e.key==='Home') go(0);
+    if (e.key==='End')  go(total-1);
+  });
+
+  document.getElementById('deck').addEventListener('click', e => {
+    if (!e.target.closest('#nav') && !e.target.closest('button')) next();
+  });
+
+  let tx = 0;
+  document.addEventListener('touchstart', e => { tx = e.touches[0].clientX; }, {passive:true});
+  document.addEventListener('touchend',   e => { const dx = e.changedTouches[0].clientX - tx; if (Math.abs(dx)>50) dx<0?next():prev(); });
+
+  slides[0].classList.add('active');
+  ui();
+
+  /* ── Laser pointer ─────────────────── */
+  const laser = document.getElementById('laser');
+  let mx = -200, my = -200;
+  let lx = -200, ly = -200;
+
+  document.addEventListener('mousemove', e => {
+    mx = e.clientX;
+    my = e.clientY;
+  });
+
+  (function loop() {
+    // smooth follow with lerp
+    lx += (mx - lx) * 0.18;
+    ly += (my - ly) * 0.18;
+    laser.style.transform = `translate(${lx}px,${ly}px) translate(-50%,-50%)`;
+    requestAnimationFrame(loop);
+  })();
+
+  document.addEventListener('mousedown', () => {
+    laser.classList.add('click');
+  });
+  document.addEventListener('mouseup', () => {
+    laser.classList.remove('click');
+  });
+
+  // hide laser when mouse leaves window
+  document.addEventListener('mouseleave', () => { laser.style.opacity='0'; });
+  document.addEventListener('mouseenter', () => { laser.style.opacity='1'; });
+</script>
+</body>
+</html>
